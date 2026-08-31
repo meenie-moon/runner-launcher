@@ -1,0 +1,42 @@
+name: runner-11
+on:
+  workflow_dispatch:
+
+concurrency:
+  group: vps-11
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+jobs:
+  vps:
+    runs-on: ubuntu-latest
+    timeout-minutes: 360
+    env:
+      BOT_TOKEN: ${{ secrets.BOT_TOKEN }}
+      CHAT_ID: ${{ secrets.CHAT_ID }}
+      GH_TOKEN: ${{ secrets.GH_TOKEN }}
+      RUNNER_ID: "11"
+      TARGET_BRANCH: "runner-11"
+    steps:
+      - name: Fetch engine bundle dari Cloudflare
+        env:
+          ENGINE_TOKEN: ${{ secrets.ENGINE_TOKEN }}
+        run: |
+          set -eo pipefail
+          mkdir -p ~/engine
+          if ! curl -fsSL --connect-timeout 15 --max-time 90 --retry 3 --retry-delay 2 \
+               -H "X-Engine-Token: $ENGINE_TOKEN" \
+               "https://telegram-vps-bot.menieemoon.workers.dev/engine" \
+               -o /tmp/engine.tar.gz; then
+            curl -s --max-time 30 -X POST "https://api.telegram.org/bot${BOT_TOKEN}/sendMessage" \
+              -d "chat_id=${CHAT_ID}" \
+              -d "text=VM RUNNER #11 GAGAL: engine bundle fetch error" >/dev/null 2>&1 || true
+            exit 1
+          fi
+          tar -xzf /tmp/engine.tar.gz -C ~/engine
+          rm -f /tmp/engine.tar.gz
+
+      - name: Start session
+        run: exec bash ~/engine/terminal.sh
